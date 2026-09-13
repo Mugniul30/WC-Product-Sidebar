@@ -42,9 +42,48 @@ final class Rest {
 				'callback'            => [ $this, 'get_products' ],
 				'permission_callback' => '__return_true',
 				'args'                => [
-					'search' => [ 'sanitize_callback' => 'sanitize_text_field', 'default' => '' ],
-					'bust'   => [ 'sanitize_callback' => 'absint',              'default' => 0  ],
+					'search'   => [ 'sanitize_callback' => 'sanitize_text_field', 'default' => '' ],
+					'bust'     => [ 'sanitize_callback' => 'absint',              'default' => 0  ],
+					'page'     => [ 'sanitize_callback' => 'absint',              'default' => 1  ],
+					'per_page' => [ 'sanitize_callback' => 'absint',              'default' => 200 ],
 				],
+			]
+		);
+
+		// ── GET /wc-ps/v1/settings ──────────────────────────────────────
+		register_rest_route(
+			self::NAMESPACE,
+			'/settings',
+			[
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => [ $this, 'get_settings' ],
+				'permission_callback' => '__return_true',
+			]
+		);
+
+		// ── GET /wc-ps/v1/nonce ──────────────────────────────────────
+		// Uncached fresh nonces so a page/CDN-cached HTML never leaves a
+		// device with an expired nonce behind.
+		register_rest_route(
+			self::NAMESPACE,
+			'/nonce',
+			[
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => [ $this, 'get_nonce' ],
+				'permission_callback' => '__return_true',
+			]
+		);
+
+		// ── GET /wc-ps/v1/cart/count ────────────────────────────────────
+		// Lets the sidebar badge reflect the real cart on first page load
+		// (items added earlier, on another page, or before reload).
+		register_rest_route(
+			self::NAMESPACE,
+			'/cart/count',
+			[
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => [ $this, 'get_cart_count' ],
+				'permission_callback' => '__return_true',
 			]
 		);
 
@@ -92,6 +131,27 @@ final class Rest {
 	}
 
 	/**
+	 * Return fresh nonces for the frontend (uncached).
+	 *
+	 * Page/CDN caches can serve HTML with expired localized nonces to some
+	 * devices; the React app calls this endpoint to self-heal.
+	 */
+	public function get_nonce( \WP_REST_Request $request ): \WP_REST_Response {
+		$response = new \WP_REST_Response(
+			[
+				'nonce'   => Security::create_nonce(),
+				'wpNonce' => wp_create_nonce( 'wp_rest' ),
+			],
+			200
+		);
+
+		$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0' );
+		$response->header( 'Pragma', 'no-cache' );
+
+		return $response;
+	}
+
+	/**
 	 * Return the current admin configuration.
 	 *
 	 * This endpoint is intentionally uncached. It lets the frontend obtain
@@ -116,6 +176,9 @@ final class Rest {
 				'showCategoryHeadings' => (bool) $s['show_category_headings'],
 				'featuredFirst'        => (bool) $s['featured_first'],
 				'hiddenCategories'     => array_map( 'intval', (array) $s['hidden_categories'] ),
+				'initialCartCount'     => ( WC()->cart instanceof \WC_Cart ) ? (int) WC()->cart->get_cart_contents_count() : 0,
+				'nonce'                => Security::create_nonce(),
+				'wpNonce'              => wp_create_nonce( 'wp_rest' ),
 				'version'              => WCPS_VERSION . '-' . wp_date( 'U' ),
 			],
 			200
@@ -134,7 +197,9 @@ final class Rest {
 	public function get_products( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 
 		$search   = (string) $request->get_param( 'search' );
-		$bust     = (bool)   $request->get_param( 'bust' );
+		$bust     = (bool) $request->get_param( 'bust' );
+		$page     = max( 1, (int) $request->get_param( 'page' ) );
+		$per_page = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ) );
 		$settings = Settings::all();
 
 		// Serve from transient cache on full (non-search) requests
@@ -149,12 +214,20 @@ final class Rest {
 
 		$args = [
 			'status'   => 'publish',
-			'limit'    => 200,
+			'limit'    => $per_page,
+			'page'     => $page,
 			'paginate' => false,
 			'return'   => 'objects',
 			'orderby'  => 'title',
 			'order'    => 'ASC',
 		];
+
+		/**
+		 * Filter the WooCommerce product query arguments.
+		 *
+		 * @param array $args Query args passed to wc_get_products().
+		 */
+		$args = apply_filters( 'wcps/products_query_args', $args );
 
 		if ( $search ) {
 			$args['s'] = $search;
@@ -202,7 +275,7 @@ final class Rest {
 						? wp_get_attachment_image_url( (int) $thumb_id, 'thumbnail' )
 						: wc_placeholder_img_src( 'thumbnail' );
 
-					$products[] = [
+					$item = [
 						'id'          => $variation->get_id(),
 						'parent_id'   => $product->get_id(),
 						'name'        => $label,
@@ -210,13 +283,21 @@ final class Rest {
 						'price_html'  => $variation->get_price_html(),
 						'featured'    => $product->is_featured(),
 						'categories'  => $cats,
-						'thumbnail'   => esc_url( (string) $thumb_url ),
+						'thumbnail'   => esc_url_raw( (string) $thumb_url ),
 						'in_stock'    => $variation->is_in_stock(),
 						'stock_qty'   => $variation->get_manage_stock() ? $variation->get_stock_quantity() : null,
 						'type'        => 'variation',
 						'attributes'  => $vd['attributes'],  // passed back to add_to_cart
 						'permalink'   => get_permalink( $product->get_id() ),
 					];
+
+					/**
+					 * Filter an individual product row before it enters the REST response.
+					 *
+					 * @param array       $item      Product data array.
+					 * @param \WC_Product $variation The WooCommerce product object.
+					 */
+					$products[] = apply_filters( 'wcps/product_data', $item, $variation );
 				}
 				continue;
 			}
@@ -232,7 +313,7 @@ final class Rest {
 				? wp_get_attachment_image_url( (int) $thumb_id, 'thumbnail' )
 				: wc_placeholder_img_src( 'thumbnail' );
 
-			$products[] = [
+			$item = [
 				'id'         => $product->get_id(),
 				'parent_id'  => null,
 				'name'       => $product->get_name(),
@@ -240,13 +321,15 @@ final class Rest {
 				'price_html' => $product->get_price_html(),
 				'featured'   => $product->is_featured(),
 				'categories' => $cats,
-				'thumbnail'  => esc_url( (string) $thumb_url ),
+				'thumbnail'  => esc_url_raw( (string) $thumb_url ),
 				'in_stock'   => $product->is_in_stock(),
 				'stock_qty'  => $product->get_manage_stock() ? $product->get_stock_quantity() : null,
 				'type'       => $product->get_type(),
 				'attributes' => [],
 				'permalink'  => get_permalink( $product->get_id() ),
 			];
+
+			$products[] = apply_filters( 'wcps/product_data', $item, $product );
 		}
 
 		// Featured-first sort
@@ -255,10 +338,44 @@ final class Rest {
 		}
 
 		if ( ! $search ) {
-			set_transient( self::CACHE_KEY, $products, self::CACHE_TTL );
+			/** Filter the product cache duration in seconds. */
+			$ttl = (int) apply_filters( 'wcps/cache_ttl', self::CACHE_TTL );
+			set_transient( self::CACHE_KEY, $products, max( 60, $ttl ) );
 		}
 
+		/** Fires after the sidebar product list has been built. */
+		do_action( 'wcps/after_output', $products );
+
 		return new \WP_REST_Response( $products, 200 );
+	}
+
+	/* ─────────────────────────────────────────────────────────────────────
+	 * GET /wc-ps/v1/cart/count
+	 *
+	 * Returns the live cart item count (and checkout URL) so the ribbon
+	 * badge is correct on first paint — even when items were added on a
+	 * previous page load or before a reload.
+	 * ───────────────────────────────────────────────────────────────────── */
+
+	public function get_cart_count( \WP_REST_Request $request ): \WP_REST_Response {
+		$this->ensure_wc_cart();
+
+		$count = ( WC()->cart instanceof \WC_Cart )
+			? WC()->cart->get_cart_contents_count()
+			: 0;
+
+		$response = new \WP_REST_Response(
+			[
+				'cart_count'   => (int) $count,
+				'checkout_url' => wc_get_checkout_url(),
+			],
+			200
+		);
+
+		$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0' );
+		$response->header( 'Pragma', 'no-cache' );
+
+		return $response;
 	}
 
 	/* ─────────────────────────────────────────────────────────────────────
@@ -275,8 +392,16 @@ final class Rest {
 	public function add_to_cart( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 
 		// ── 1. Resolve product ───────────────────────────────────────────
-		$product_id = (int) $request->get_param( 'product_id' ); // ← must be on its own line
-		$quantity   = max( 1, (int) $request->get_param( 'quantity' ) );
+		$product_id = absint( $request->get_param( 'product_id' ) ); // ← must be on its own line
+		$quantity   = min( 99, max( 1, absint( $request->get_param( 'quantity' ) ) ) );
+
+		if ( $product_id <= 0 ) {
+			return new \WP_Error(
+				'wcps_invalid_product',
+				__( 'Product not found.', 'wc-product-sidebar' ),
+				[ 'status' => 404 ]
+			);
+		}
 
 		$product = wc_get_product( $product_id );
 
@@ -288,6 +413,14 @@ final class Rest {
 			);
 		}
 
+		if ( ! $product->is_purchasable() ) {
+			return new \WP_Error(
+				'wcps_not_purchasable',
+				__( 'This product cannot be purchased.', 'wc-product-sidebar' ),
+				[ 'status' => 400 ]
+			);
+		}
+
 		if ( ! $product->is_in_stock() ) {
 			return new \WP_Error(
 				'wcps_out_of_stock',
@@ -295,6 +428,15 @@ final class Rest {
 				[ 'status' => 400 ]
 			);
 		}
+
+		if ( $product->is_sold_individually() ) {
+			$quantity = 1;
+		} elseif ( $product->get_manage_stock() && is_numeric( $product->get_stock_quantity() ) ) {
+			$quantity = min( $quantity, max( 1, (int) $product->get_stock_quantity() ) );
+		}
+
+		/** Fires before a sidebar add-to-cart is processed. */
+		do_action( 'wcps/before_output', $product, $quantity );
 
 		// ── 2. Boot WooCommerce session + cart (with existing data) ──────
 		$this->ensure_wc_cart();
@@ -341,12 +483,16 @@ final class Rest {
 		$this->save_session();
 
 		// ── 5. Return updated cart state ─────────────────────────────────
+		// Always point shoppers at checkout (not the cart page) for direct checkout.
+		$checkout_url = wc_get_checkout_url();
 		return new \WP_REST_Response(
 			[
-				'success'    => true,
-				'cart_count' => WC()->cart->get_cart_contents_count(),
-				'cart_total' => WC()->cart->get_cart_total(),
-				'cart_url'   => wc_get_cart_url(),
+				'success'      => true,
+				'cart_count'   => WC()->cart->get_cart_contents_count(),
+				'cart_total'   => WC()->cart->get_cart_total(),
+				'cart_url'     => $checkout_url,
+				'checkout_url' => $checkout_url,
+				'product_name' => $product->get_name(),
 				'message'    => sprintf(
 					/* translators: %s: product name */
 					__( '"%s" added to your cart.', 'wc-product-sidebar' ),
@@ -383,16 +529,11 @@ final class Rest {
 		}
 
 		/*
-		 * If WooCommerce created the session after the cart object was already
-		 * present, make sure the cart reflects the current session. This is
-		 * intentionally only done when a session exists and the cart has not
-		 * already been populated for this request.
+		 * If the cart object already holds items for this request it reflects
+		 * the current session — there is nothing more to load. Otherwise pull
+		 * the stored session cart into memory so save_data() cannot wipe it.
 		 */
-		if ( WC()->session && WC()->cart && ! WC()->cart->is_empty() ) {
-			return;
-		}
-
-		if ( WC()->session && WC()->cart ) {
+		if ( WC()->session && WC()->cart && WC()->cart->is_empty() ) {
 			WC()->cart->get_cart_from_session();
 		}
 	}

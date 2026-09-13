@@ -80,7 +80,14 @@ const Sidebar = memo(({ isOpen, onClose, config, ribbonPosition }) => {
                 <path d="M16 10a4 4 0 0 1-8 0" />
               </svg>
             </span>
-            <h2 className="wcps-sidebar-title">{settings.buttonLabel || 'Products'}</h2>
+            <h2 className="wcps-sidebar-title">
+              {settings.buttonLabel || 'Products'}
+              <span className="wcps-sidebar-subtitle">
+                {products.length > 0
+                  ? `${products.length} product${products.length === 1 ? '' : 's'} available`
+                  : (i18n.shopSubtitle || 'Shop our research collection')}
+              </span>
+            </h2>
           </div>
           <button
             className="wcps-close-btn"
@@ -105,6 +112,11 @@ const Sidebar = memo(({ isOpen, onClose, config, ribbonPosition }) => {
 
         {/* Product list */}
         <div className="wcps-sidebar-body">
+          {!loading && !error && search.trim() && products.length > 0 && (
+            <p className="wcps-results-count" role="status">
+              {products.length} result{products.length === 1 ? '' : 's'} for “{search.trim()}”
+            </p>
+          )}
           {loading && (
             <div className="wcps-loading">
               <div className="wcps-spinner" aria-hidden="true" />
@@ -166,6 +178,7 @@ const Sidebar = memo(({ isOpen, onClose, config, ribbonPosition }) => {
               </svg>
               {i18n.viewCart || 'View Cart'}
             </a>
+            <p className="wcps-footer-note">{i18n.footerNote || 'Secure checkout · Research use only'}</p>
           </div>
         )}
       </aside>

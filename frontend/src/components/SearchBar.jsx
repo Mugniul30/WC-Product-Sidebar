@@ -19,6 +19,10 @@ const SearchBar = memo(({ value, onChange, placeholder }) => {
     debounce((val) => onChange(val), 300)
   ).current;
 
+  useEffect(() => () => {
+    debouncedOnChange.cancel?.();
+  }, [debouncedOnChange]);
+
   const handleChange = useCallback((e) => {
     const val = e.target.value;
     setLocalValue(val);

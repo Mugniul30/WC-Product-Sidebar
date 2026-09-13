@@ -16,6 +16,17 @@
 		var root = document.getElementById('wcps-root');
 		if (!root || !settings) return;
 
+		// Fresh nonces may ride along with settings — keep them in sync so a
+		// cached page never holds stale credentials on any device.
+		if (typeof settings.nonce === 'string' && settings.nonce) {
+			window.wcpsConfig = window.wcpsConfig || {};
+			window.wcpsConfig.nonce = settings.nonce;
+		}
+		if (typeof settings.wpNonce === 'string' && settings.wpNonce) {
+			window.wcpsConfig = window.wcpsConfig || {};
+			window.wcpsConfig.wpNonce = settings.wpNonce;
+		}
+
 		var bg = cssValue(settings.bgColor, '#ffffff');
 		var icon = cssValue(settings.iconColor, '#2563eb');
 		var ribbon = cssValue(settings.ribbonColor, '#2563eb');
@@ -67,12 +78,24 @@
 		window.wcpsConfig.settings.showCategoryHeadings = !!settings.showCategoryHeadings;
 		window.wcpsConfig.settings.featuredFirst = !!settings.featuredFirst;
 		window.wcpsConfig.settings.hiddenCategories = settings.hiddenCategories || [];
+		// Live cart count rides along with settings so a cached page also
+		// refreshes the ribbon badge (React re-syncs on custom event too).
+		if (typeof settings.initialCartCount === 'number') {
+			window.wcpsConfig.initialCartCount = settings.initialCartCount;
+			window.dispatchEvent(new CustomEvent('wcps:cart-count', {
+				detail: { cartCount: settings.initialCartCount }
+			}));
+		}
 	}
 
 	function fetchSettings() {
 		var config = window.wcpsConfig || {};
 		var url = config.settingsUrl;
-		if (!url) return;
+		if (!url || typeof url !== 'string') return;
+
+		// Skip the live refresh when the endpoint is unavailable (e.g. pretty
+		// permalinks disabled) — the localized config already holds settings.
+		if (url.indexOf('rest_route') === -1 && url.indexOf('wp-json') === -1) return;
 
 		var separator = url.indexOf('?') === -1 ? '?' : '&';
 		url += separator + '_wcps_settings=' + Date.now();
@@ -84,18 +107,20 @@
 			headers: { 'Accept': 'application/json' }
 		})
 		.then(function (response) {
-			if (!response.ok) throw new Error('Settings request failed: ' + response.status);
+			if (!response.ok) return null;
 			return response.json();
 		})
-		.then(applySettings)
-		.catch(function (error) {
-			if (window.console && console.warn) {
-				console.warn('[WC Product Sidebar] Could not refresh settings.', error);
-			}
+		.then(function (settings) {
+			if (settings) applySettings(settings);
+		})
+		.catch(function () {
+			// Settings refresh is best-effort; the localized config is the
+			// fallback, so stay silent instead of logging console errors.
 		});
 	}
 
 	function start() {
+		if (!('fetch' in window)) return;
 		fetchSettings();
 
 		// React may mount after this script. Re-apply once when the root appears.

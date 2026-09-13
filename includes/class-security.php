@@ -39,10 +39,10 @@ final class Security {
 	}
 
 	/**
-	 * Sanitize an integer.
+	 * Sanitize an integer (absolute, no negatives).
 	 */
 	public static function sanitize_int( mixed $value ): int {
-		return (int) $value;
+		return absint( $value );
 	}
 
 	/**
@@ -78,7 +78,10 @@ final class Security {
 		if ( ! is_array( $value ) ) {
 			return [];
 		}
-		return array_map( 'intval', $value );
+		$clean = array_map( 'absint', $value );
+		$clean = array_filter( $clean, static fn( $id ) => $id > 0 );
+		$clean = array_unique( $clean );
+		return array_values( $clean );
 	}
 
 	/**
@@ -89,23 +92,5 @@ final class Security {
 		// Allow letters, digits, spaces, and plus signs (URL-encoded Google fonts)
 		$value = preg_replace( '/[^a-zA-Z0-9 +\-,]/', '', $value );
 		return $value ?? '';
-	}
-
-	/**
-	 * Verify a REST API request nonce from the X-WP-Nonce header or _wpnonce param.
-	 */
-	public static function verify_rest_nonce( \WP_REST_Request $request ): bool {
-		$nonce = $request->get_header( 'X-WP-Nonce' )
-			?? $request->get_param( '_wpnonce' )
-			?? '';
-		return self::verify_nonce( $nonce );
-	}
-
-	/**
-	 * Check if the current user can view products (public endpoint, but rate-limited by nonce).
-	 */
-	public static function rest_permissions_check( \WP_REST_Request $request ): bool|\WP_Error {
-		// Products are public; we just verify nonce to prevent scraping
-		return true;
 	}
 }

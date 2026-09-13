@@ -27,11 +27,11 @@ final class Settings {
 	 */
 	public static function defaults(): array {
 		return [
-			// Appearance
-			'bg_color'             => '#ffffff',
-			'icon_color'           => '#2563eb',
-			'ribbon_color'         => '#2563eb',
-			'font_color'           => '#1f2937',
+			// Appearance (matches Peptides World purple storefront theme)
+			'bg_color'             => '#faf7fe',
+			'icon_color'           => '#ffffff',
+			'ribbon_color'         => '#7b1fa2',
+			'font_color'           => '#2d1b4e',
 			'font_size'            => '14px',
 			'font_family'          => 'inherit',
 			'google_font'          => '',
@@ -80,9 +80,9 @@ final class Settings {
 		$ribbon_position = in_array( $raw['ribbon_position'] ?? 'left', [ 'left', 'right' ], true ) ? $raw['ribbon_position'] : 'left';
 
 		$clean = [
-			'bg_color'               => Security::sanitize_hex_color( $raw['bg_color'] ?? '' ) ?: '#ffffff',
-			'icon_color'             => Security::sanitize_hex_color( $raw['icon_color'] ?? '' ) ?: '#2563eb',
-			'ribbon_color'           => Security::sanitize_hex_color( $raw['ribbon_color'] ?? '' ) ?: '#2563eb',
+			'bg_color'               => Security::sanitize_hex_color( $raw['bg_color'] ?? '' ) ?: '#faf7fe',
+			'icon_color'             => Security::sanitize_hex_color( $raw['icon_color'] ?? '' ) ?: '#ffffff',
+			'ribbon_color'           => Security::sanitize_hex_color( $raw['ribbon_color'] ?? '' ) ?: '#7b1fa2',
 			'font_color'             => Security::sanitize_hex_color( $raw['font_color'] ?? '' ) ?: '#1f2937',
 			'font_size'              => Security::sanitize_css_size( $raw['font_size'] ?? '14px' ),
 			'font_family'            => Security::sanitize_font_family( $raw['font_family'] ?? 'inherit' ),

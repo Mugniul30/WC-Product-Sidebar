@@ -3,13 +3,17 @@
  * Plugin Name:       WC Product Sidebar
  * Plugin URI:        https://github.com/Mugniul30/WC-Product-Sidebar.git
  * Description:       A React-based WooCommerce product sidebar with slide-in panel, category grouping, and AJAX add-to-cart.
- * Version:           3.0.0
+ * Version:           3.0.3
  * Author:            Mugniul Afif
  * Author URI:        https://github.com/Mugniul30/
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       wc-product-sidebar
  * Domain Path:       /languages
+ * Requires at least: 6.0
+ * Requires PHP:      8.0
+ * WC requires at least: 7.0
+ * WC tested up to:   9.0
 
  */
 
@@ -20,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants
-define( 'WCPS_VERSION',      '2.4.0' );
+define( 'WCPS_VERSION',      '3.0.3' );
 define( 'WCPS_FILE',         __FILE__ );
 define( 'WCPS_PATH',         plugin_dir_path( __FILE__ ) );
 define( 'WCPS_URL',          plugin_dir_url( __FILE__ ) );

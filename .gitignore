@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build artifacts (regenerable via npm)
+dist/
+*.zip
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+
+# Misc
+.env
+coverage/

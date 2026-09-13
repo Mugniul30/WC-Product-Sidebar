@@ -26,8 +26,9 @@ A production-ready WooCommerce WordPress plugin that adds a React-based slide-in
 ### Option A — Upload ZIP
 
 1. Download or clone this repository
-2. Build the React frontend (see below)
-3. ZIP the `wc-product-sidebar/` folder
+2. Install dependencies and build the React frontend (see below)
+3. From the plugin root, run `npm run zip` — this builds a clean
+   `wc-product-sidebar.zip` excluding `node_modules/`, sources and tooling
 4. Upload via **WP Admin → Plugins → Add New → Upload Plugin**
 5. Activate
 

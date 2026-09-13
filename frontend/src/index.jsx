@@ -8,18 +8,20 @@ import App from './App';
 
 // Mount when DOM is ready
 const mount = () => {
-  const container = document.getElementById('wcps-root');
+  let container = document.getElementById('wcps-root');
   if (!container) {
     // Inject mount point
-    const div = document.createElement('div');
-    div.id = 'wcps-root';
-    document.body.appendChild(div);
-    createRoot(div).render(
-      <StrictMode>
-        <App config={window.wcpsConfig || {}} />
-      </StrictMode>
-    );
+    container = document.createElement('div');
+    container.id = 'wcps-root';
+    document.body.appendChild(container);
   }
+  if (container.__wcpsMounted) return;
+  container.__wcpsMounted = true;
+  createRoot(container).render(
+    <StrictMode>
+      <App config={window.wcpsConfig || {}} />
+    </StrictMode>
+  );
 };
 
 if (document.readyState === 'loading') {
