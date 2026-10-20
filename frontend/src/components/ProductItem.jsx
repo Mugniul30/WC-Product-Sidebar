@@ -2,7 +2,7 @@
  * ProductItem — single product row, all controls on one line
  */
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import QuantityControl from './QuantityControl';
 import { useCartContext } from '../context/CartContext';
 
@@ -11,6 +11,7 @@ const ProductItem = memo(({ product, config }) => {
   const [adding, setAdding] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
   const { addToCart } = useCartContext();
+  const timerRef = useRef(null);
   const i18n = config?.i18n || {};
 
   const isOutOfStock = !product.in_stock;
@@ -20,15 +21,23 @@ const ProductItem = memo(({ product, config }) => {
 
   const handleAddToCart = useCallback(async () => {
     if (adding || isOutOfStock) return;
-    if (isVariable) { window.open(product.permalink, '_blank'); return; }
+    if (isVariable) {
+      if (product.permalink) window.open(product.permalink, '_blank', 'noopener,noreferrer');
+      return;
+    }
     setAdding(true);
     try {
       await addToCart(product.id, quantity);
       setJustAdded(true);
-      setTimeout(() => setJustAdded(false), 2000);
-    } catch { /* toast shown by context */ }
-    finally { setAdding(false); }
+      timerRef.current = setTimeout(() => setJustAdded(false), 2000);
+    } catch {
+      // Toast is shown by cart context; no further action needed here.
+    } finally { setAdding(false); }
   }, [adding, isOutOfStock, isVariable, product, quantity, addToCart]);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
   return (
     <article className={`wcps-product-item ${isOutOfStock ? 'wcps-product-item--oos' : ''}`}>

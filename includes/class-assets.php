@@ -81,10 +81,17 @@ final class Assets {
 		);
 
 		// --- Pass data to React via window.wcpsConfig ---
+		$initial_cart_count = 0;
+		if ( function_exists( 'WC' ) && WC() instanceof \WooCommerce && WC()->cart instanceof \WC_Cart ) {
+			$initial_cart_count = (int) WC()->cart->get_cart_contents_count();
+		}
 		$config = [
-			'apiUrl'       => esc_url( rest_url( 'wc-ps/v1/products' ) ),
-			'settingsUrl'  => esc_url( rest_url( 'wc-ps/v1/settings' ) ),
-			'cartUrl'      => esc_url( rest_url( 'wc-ps/v1/cart/add' ) ),
+			'apiUrl'       => esc_url_raw( rest_url( 'wc-ps/v1/products' ) ),
+			'settingsUrl'  => esc_url_raw( rest_url( 'wc-ps/v1/settings' ) ),
+			'cartUrl'      => esc_url_raw( rest_url( 'wc-ps/v1/cart/add' ) ),
+			'cartCountUrl' => esc_url_raw( rest_url( 'wc-ps/v1/cart/count' ) ),
+			'initialCartCount' => $initial_cart_count,
+			'nonceUrl'     => esc_url_raw( rest_url( 'wc-ps/v1/nonce' ) ),
 			'nonce'        => Security::create_nonce(),
 			'wpNonce'      => wp_create_nonce( 'wp_rest' ),
 			'cssVars'      => [
@@ -100,11 +107,11 @@ final class Assets {
 			'settings'     => [
 				'showCategoryHeadings' => (bool) $settings['show_category_headings'],
 				'featuredFirst'        => (bool) $settings['featured_first'],
-				'buttonLabel'          => esc_html( $settings['button_label'] ),
-				'ribbonPosition'       => esc_attr( $settings['ribbon_position'] ),
-				'hiddenCategories'     => array_map( 'intval', (array) $settings['hidden_categories'] ),
+				'buttonLabel'          => $settings['button_label'],
+				'ribbonPosition'       => $settings['ribbon_position'],
+				'hiddenCategories'     => array_map( 'absint', (array) $settings['hidden_categories'] ),
 			],
-			'cartPageUrl'  => esc_url( wc_get_checkout_url() ),
+			'cartPageUrl'  => esc_url_raw( wc_get_checkout_url() ),
 			'i18n'         => [
 				'searchPlaceholder' => __( 'Search products…', 'wc-product-sidebar' ),
 				'addToCart'         => __( 'Add to Cart', 'wc-product-sidebar' ),
@@ -115,6 +122,11 @@ final class Assets {
 				'loading'           => __( 'Loading products…', 'wc-product-sidebar' ),
 				'noProducts'        => __( 'No products found.', 'wc-product-sidebar' ),
 				'added'             => __( 'Added!', 'wc-product-sidebar' ),
+				'addedTitle'        => __( 'Added to cart', 'wc-product-sidebar' ),
+				'errorTitle'        => __( 'Something went wrong', 'wc-product-sidebar' ),
+				'shopSubtitle'      => __( 'Shop our research collection', 'wc-product-sidebar' ),
+				'footerNote'        => __( 'Secure checkout · Research use only', 'wc-product-sidebar' ),
+				'sessionExpired'    => __( 'Security session expired. Please reload the page and try again.', 'wc-product-sidebar' ),
 			],
 		];
 
@@ -193,17 +205,27 @@ final class Assets {
 			#wcps-root .wcps-view-cart-btn {
 				background-color: var(--wcps-ribbon) !important;
 			}
+			#wcps-root .wcps-category-header,
+			#wcps-root .wcps-category-name,
+			#wcps-root .wcps-category-chevron {
+				color: #fff !important;
+			}
+			#wcps-root .wcps-category-count {
+				background: #fff !important;
+				border: none !important;
+				color: var(--wcps-ribbon) !important;
+			}
 			#wcps-root .wcps-ribbon-icon,
 			#wcps-root .wcps-sidebar-icon {
 				color: var(--wcps-icon) !important;
 			}
 			#wcps-root .wcps-ribbon-btn {
-				%s: 0 !important;
-				%s: auto !important;
+				%7$s: 0 !important;
+				%8$s: auto !important;
 			}
 			#wcps-root .wcps-sidebar {
-				%s: 0 !important;
-				%s: auto !important;
+				%7$s: 0 !important;
+				%8$s: auto !important;
 			}
 			#wcps-root .wcps-product-name,
 			#wcps-root .wcps-product-info,

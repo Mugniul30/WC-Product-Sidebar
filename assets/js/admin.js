@@ -21,13 +21,17 @@
 			window.scrollTo({ top: 0, behavior: 'smooth' });
 		});
 
-		$('.wcps-color-picker').wpColorPicker({
-			change: function () { updatePreview(); markDirty(); },
-			clear: function () { updatePreview(); markDirty(); }
+		$('.wcps-color-picker').each(function () {
+			if (typeof $(this).wpColorPicker === 'function') {
+				$(this).wpColorPicker({
+					change: function () { updatePreview(); markDirty(); },
+					clear: function () { updatePreview(); markDirty(); }
+				});
+			}
 		});
 
 		function updatePreview() {
-			var ribbonColor = $('#ribbon_color').val() || '#2563eb';
+			var ribbonColor = $('#ribbon_color').val() || '#7b1fa2';
 			var iconColor = $('#icon_color').val() || '#ffffff';
 			var label = $('#button_label').val() || 'Products';
 
@@ -58,7 +62,7 @@
 
 		$('.wcps-bust-cache').on('click', function () {
 			var $btn = $(this);
-			if ($btn.prop('disabled')) return;
+			if ($btn.prop('disabled') || typeof ajaxurl === 'undefined') return;
 			$btn.prop('disabled', true).text('Clearing…');
 
 			$.post(ajaxurl, {
@@ -76,6 +80,7 @@
 		});
 
 		$('.wcps-reset-settings').on('click', function () {
+			if (typeof ajaxurl === 'undefined') return;
 			if (!window.confirm('Restore all Product Sidebar settings to their defaults?')) return;
 
 			var $btn = $(this);

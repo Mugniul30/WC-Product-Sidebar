@@ -76,8 +76,8 @@ export function useProducts(config) {
     const q = search.toLowerCase();
     return allProducts.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.categories?.some((c) => c.name.toLowerCase().includes(q))
+        (p.name || '').toLowerCase().includes(q) ||
+        p.categories?.some((c) => (c.name || '').toLowerCase().includes(q))
     );
   }, [allProducts, search]);
 

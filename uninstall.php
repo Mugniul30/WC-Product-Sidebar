@@ -18,7 +18,11 @@ delete_transient( 'wcps_products_cache' );
 // Remove user-level transients if multisite
 if ( is_multisite() ) {
 	$sites = get_sites( [ 'fields' => 'ids' ] );
+	$current_site_id = get_current_blog_id();
 	foreach ( $sites as $site_id ) {
+		if ( (int) $site_id === (int) $current_site_id ) {
+			continue; // already cleaned above
+		}
 		switch_to_blog( $site_id );
 		delete_option( 'wcps_settings' );
 		delete_transient( 'wcps_products_cache' );

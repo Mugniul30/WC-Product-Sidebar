@@ -1,0 +1,19 @@
+# Files excluded when packaging the plugin for distribution.
+# (Used by packaging scripts / WP deployment tooling.)
+
+/.git/
+/.github/
+/.commandcode/
+/node_modules/
+/frontend/node_modules/
+/frontend/src/
+/frontend/package.json
+/frontend/package-lock.json
+/frontend/webpack.config.js
+/package.json
+/package-lock.json
+.gitignore
+.distignore
+.DS_Store
+*.zip
+npm-debug.log*
