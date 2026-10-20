@@ -1221,6 +1221,12 @@
     left: 14px;
     right: auto;
     border-radius: 999px;
+    padding: 13px !important;
+  }
+
+  /* Icon-only on phones: hide the text label on the floating ribbon button */
+  .wcps-ribbon-btn--left .wcps-ribbon-label {
+    display: none;
   }
 
   .wcps-ribbon-btn--left:hover {
